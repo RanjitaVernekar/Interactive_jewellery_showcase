@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Auric Solitaire — Elegant Viewer</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <style>
+    html,body { height:100%; margin:0; background:#0f1214; font-family:Inter, system-ui, Arial; color:#fff; }
+
+    .ui {
+      position: fixed;
+      left: 50%; transform: translateX(-50%);
+      top: 18px; z-index: 40; text-align: center;
+      pointer-events: none;
+      width: calc(min(980px, 95vw));
+    }
+    .brand {
+      pointer-events: auto;
+      display:inline-block;
+      background:linear-gradient(90deg,#111,#222);
+      padding:10px 18px; border-radius:12px;
+      box-shadow:0 8px 30px rgba(0,0,0,0.5);
+    }
+    .brand h1 { margin:0; font-size:20px; font-weight:800; color:#f5efe6; }
+    .brand p { margin:4px 0 0; font-size:12px; opacity:.85; }
+
+    #closeBtn {
+      position: fixed; left:50%; transform:translateX(-50%);
+      bottom: 26px; z-index:40;
+      background:#f5efe6; color:#111;
+      border:none; padding:12px 22px;
+      display:none; cursor:pointer;
+      border-radius:18px; font-weight:700;
+      box-shadow:0 12px 40px rgba(5,5,5,0.6);
+    }
+
+    #vignette {
+      position: fixed; inset:0; pointer-events:none; z-index:30;
+      background: radial-gradient(60% 60% at 50% 45%, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 100%);
+    }
+
+    #hint {
+      position: fixed; left:14px; bottom:26px;
+      color:#ddd; opacity:.8; z-index:40;
+      font-size:13px; pointer-events:none;
+    }
+  </style>
+
+  <!-- SYSTEM -->
+  <script>
+    AFRAME.registerSystem('ring-system', {
+      init() { this.focused = null; }
+    });
+  </script>
+
+  <!-- DRAG ROTATE -->
+  <script>
+    AFRAME.registerComponent('drag-rotate-y', {
+      schema:{ speed:{type:'number',default:0.45}},
+      init(){
+        this.dragging=false;
+        this.startX=0;
+        this.rotY=this.el.object3D.rotation.y;
+
+        this.onDown=this.onDown.bind(this);
+        this.onMove=this.onMove.bind(this);
+        this.onUp=this.onUp.bind(this);
+
+        window.addEventListener('mousedown',this.onDown);
+        window.addEventListener('mousemove',this.onMove);
+        window.addEventListener('mouseup',this.onUp);
+
+        window.addEventListener('touchstart',this.onDown);
+        window.addEventListener('touchmove',this.onMove);
+        window.addEventListener('touchend',this.onUp);
+      },
+      getX(ev){ return ev.touches ? ev.touches[0].clientX : ev.clientX; },
+      onDown(ev){
+        const sys=this.el.sceneEl.systems['ring-system'];
+        if(sys.focused!==this.el) return;
+        this.dragging=true;
+        this.startX=this.getX(ev);
+      },
+      onMove(ev){
+        if(!this.dragging) return;
+        const dx=this.getX(ev)-this.startX;
+        this.startX=this.getX(ev);
+        this.rotY+=dx*0.01*this.data.speed;
+        this.el.object3D.rotation.y=this.rotY;
+      },
+      onUp(){ this.dragging=false; }
+    });
+  </script>
+
+  <!-- CLICK-FOCUS -->
+  <script>
+    AFRAME.registerComponent('click-focus',{
+      schema:{
+        focusPos:{type:'vec3',default:{x:0,y:1.45,z:-0.9}},
+        focusScale:{type:'vec3',default:{x:1.6,y:1.6,z:1.6}},
+        duration:{default:420}
+      },
+      init(){
+        this.homePos=this.el.getAttribute('position');
+        this.homeScale=this.el.getAttribute('scale');
+
+        this.el.addEventListener('click', ()=>{
+          const sys=this.el.sceneEl.systems['ring-system'];
+          if(sys.focused) return;
+
+          sys.focused=this.el;
+
+          this.el.setAttribute('animation__pos',{
+            property:'position',
+            to:`${this.data.focusPos.x} ${this.data.focusPos.y} ${this.data.focusPos.z}`,
+            dur:this.data.duration, easing:'easeOutQuad'
+          });
+
+          this.el.setAttribute('animation__scale',{
+            property:'scale',
+            to:`${this.data.focusScale.x} ${this.data.focusScale.y} ${this.data.focusScale.z}`,
+            dur:this.data.duration, easing:'easeOutQuad'
+          });
+
+          document.querySelector('#closeBtn').style.display="block";
+        });
+      },
+      defocus(){
+        this.el.setAttribute('animation__pos_back',{
+          property:'position',
+          to:`${this.homePos.x} ${this.homePos.y} ${this.homePos.z}`,
+          dur:this.data.duration, easing:'easeOutQuad'
+        });
+
+        this.el.setAttribute('animation__scale_back',{
+          property:'scale',
+          to:`${this.homeScale.x} ${this.homeScale.y} ${this.homeScale.z}`,
+          dur:this.data.duration, easing:'easeOutQuad'
+        });
+      }
+    });
+
+    function closeFocused(){
+      const scene=document.querySelector('a-scene');
+      const sys=scene.systems['ring-system'];
+      if(!sys.focused) return;
+      sys.focused.components['click-focus'].defocus();
+      sys.focused=null;
+      document.querySelector('#closeBtn').style.display="none";
+    }
+  </script>
+
+</head>
+
+<body>
+
+  <div class="ui">
+    <div class="brand">
+      <h1>Auric Solitaire</h1>
+      <p>Studio Collection</p>
+    </div>
+  </div>
+
+  <div id="vignette"></div>
+  <div id="hint">Click a ring → focus • Drag to rotate</div>
+  <button id="closeBtn" onclick="closeFocused()">Close</button>
+
+  <a-scene background="color:#08090a">
+
+    <!-- Camera with CURSOR + RAYCASTER (IMPORTANT!) -->
+    <a-entity camera look-controls cursor="rayOrigin: mouse"
+              raycaster="objects: .ring"
+              position="0 1.5 1.8">
+    </a-entity>
+
+    <a-sky color="#0b0e11"></a-sky>
+
+    <a-plane position="0 0 -2" rotation="-90 0 0" width="8" height="6"
+             material="color:#111; metalness:0.1; roughness:0.6"></a-plane>
+
+    <a-box position="0 0.48 -2" width="2.2" height="0.3" depth="1.0"
+           material="color:#16181a; metalness:0.15; roughness:0.5"></a-box>
+
+    <a-entity light="type: ambient; intensity:0.6"></a-entity>
+    <a-entity light="type: directional; intensity:0.9" position="-1 2 1"></a-entity>
+    <a-entity light="type: point; intensity:0.8; distance:6" position="1 1.8 -0.6"></a-entity>
+
+    <!-- RINGS -->
+    <a-entity class="ring" id="ring-left"
+              position="-0.6 0.9 -2"
+              click-focus drag-rotate-y>
+      <a-torus radius="0.22" radius-tubular="0.04" rotation="90 0 0"
+               material="color:#d4af37; metalness:0.9; roughness:0.18"></a-torus>
+      <a-sphere radius="0.06" position="0 0.18 0"
+                material="color:#fff; emissive:#fff; emissiveIntensity:0.18"></a-sphere>
+    </a-entity>
+
+    <a-entity class="ring" id="ring-mid"
+              position="0 0.9 -2"
+              click-focus drag-rotate-y>
+      <a-torus radius="0.24" radius-tubular="0.06" rotation="90 0 0"
+               material="color:#b76e4e; metalness:0.9; roughness:0.16"></a-torus>
+    </a-entity>
+
+    <a-entity class="ring" id="ring-right"
+              position="0.6 0.9 -2"
+              click-focus drag-rotate-y>
+      <a-torus radius="0.22" radius-tubular="0.04" rotation="90 0 0"
+               material="color:#e6eef3; metalness:0.9; roughness:0.18"></a-torus>
+      <a-sphere radius="0.06" position="0 0.18 0"
+                material="color:#fff; emissive:#fff; emissiveIntensity:0.18"></a-sphere>
+    </a-entity>
+
+  </a-scene>
+</body>
+</html>
