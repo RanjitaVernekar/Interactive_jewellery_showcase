@@ -46,4 +46,4 @@ Feel free to submit issues or pull requests for improvements.
 
 ---
 
-*Experience luxury jewelry in the palm of your hand.*
+*Experience luxury jewelry in the palm of your hand.*.
